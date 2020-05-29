@@ -1,0 +1,37 @@
+//Guidance around Apex class definitions: https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_classes_defining.htm
+global class Generate_GetWikiPages {
+    //InvocableMethod Guidance: https://developer.salesforce.com/docs/atlas.en-us.apexcode.meta/apexcode/apex_classes_annotation_InvocableMethod.htm
+    //Input parameter must be a list or list of lists of either primitive type or Object type
+    @InvocableMethod(
+        label='Related Wikipedia Pages'
+        description='Recommend wikipages that are related to the named input wikipage')
+    global static List<List<Recommendation>> getPages(List<String> relatedTo){
+        
+        List<List<Recommendation>> outputs = new List<List<Recommendation>>();
+        Http http = new Http();
+        HttpRequest request = new HttpRequest();
+        String urlName = relatedTo[0].replace(' ','_');
+        // Pre-req: Set up a Remote Site Setting for this to work.
+        request.setEndpoint('https://en.wikipedia.org/api/rest_v1/page/related/'+urlName);
+        request.setMethod('GET');
+        HttpResponse response = http.send(request);
+        if(response.getStatusCode() == 200) {
+            Map<String, Object> result = (Map<String, Object>) 
+                JSON.deserializeUntyped(response.getBody());
+            List<Recommendation> recs = new List<Recommendation>();
+            for(Object item : (List<Object>)result.get('pages')) {
+                Map<String, Object> page = (Map<String, Object>) item;
+                Recommendation rec = new Recommendation(
+                    Name = (String)page.get('displaytitle'),
+                    Description = (String)page.get('extract'),
+                    //Pre-req: Create a screen flow with the name simpleFlow
+                    ActionReference = 'simpleFlow',
+                    AcceptanceLabel = 'View'
+                );
+                recs.add(rec);
+            }
+            outputs.add(recs);
+        }
+        return outputs;
+    }
+}
